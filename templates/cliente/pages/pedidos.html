@@ -1,0 +1,36 @@
+{% extends "pages/base.html" %}
+{% block subtitulo %}Pedidos{% endblock %}
+{% block conteudo %}
+<h1 class="display-5"><b>Meus Pedidos</b></h1>
+<hr>
+{% if pedidos: %}
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Código</th>
+            <th>Data</th>
+            <th>Valor Total</th>
+            <th>Situação</th>
+            <th>Ações</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for p in pedidos: %}
+        <tr>
+            <td>{{ "{:06d}".format(p.id) }}</td>
+            <td>{{ p.data_hora }}</td>
+            <td>{{ "{:,.2f}".format(p.valor_total) }}</td>
+            <td>{{ p.estado }}</td>
+            <td>
+                <a class="btn btn-danger btn-sm" href="/cliente/detalhespedido/{{ p.id }}">
+                    Ver Detalhes
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else: %}
+<h2 class="lead">Não há pedidos em seu histórico.</h2>
+{% endif %}
+{% endblock %}

@@ -22,6 +22,7 @@ UsuarioRepo.criar_tabela()
 UsuarioRepo.inserir_usuarios_json("sql/usuarios.json")
 PedidoRepo.criar_tabela()
 CategoriaRepo.criar_tabela()
+CategoriaRepo.inserir_categorias_json("sql/categorias.json")
 ItemPedidoRepo.criar_tabela()
 app = FastAPI(dependencies=[Depends(checar_autorizacao)])
 app.add_middleware(

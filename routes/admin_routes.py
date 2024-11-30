@@ -9,9 +9,11 @@ from dtos.alterar_pedido_dto import AlterarPedidoDto
 from dtos.alterar_produto_dto import AlterarProdutoDto
 from dtos.inserir_produto_dto import InserirProdutoDto
 from dtos.problem_details_dto import ProblemDetailsDto
+from models.categoria_model import Categoria
 from models.pedido_model import EstadoPedido
 from models.produto_model import Produto
 from models.usuario_model import Usuario
+from repositories.categoria_repo import CategoriaRepo
 from repositories.item_pedido_repo import ItemPedidoRepo
 from repositories.pedido_repo import PedidoRepo
 from repositories.produto_repo import ProdutoRepo
@@ -35,13 +37,15 @@ async def inserir_produto(
     preco: float = Form(...),
     descricao: str = Form(...),
     estoque: int = Form(...),
+    id_categoria: int = Form(...),
     imagem: Optional[UploadFile] = File(None)
 ):    
     produto_dto = InserirProdutoDto(
         nome=nome,
         preco=preco,
         descricao=descricao,
-        estoque=estoque
+        estoque=estoque,
+        id_categoria=id_categoria 
     )
     conteudo_arquivo = await imagem.read()
     imagem = Image.open(BytesIO(conteudo_arquivo))
@@ -55,7 +59,8 @@ async def inserir_produto(
         return JSONResponse(pd.to_dict(), status_code=422)
     await asyncio.sleep(SLEEP_TIME)
     novo_produto = Produto(
-        None, produto_dto.nome, produto_dto.preco, produto_dto.descricao, produto_dto.estoque
+        None, produto_dto.nome, produto_dto.preco, produto_dto.descricao, produto_dto.estoque, 
+        produto_dto.id_categoria
     )
     novo_produto = ProdutoRepo.inserir(novo_produto)
     if novo_produto:
@@ -215,3 +220,123 @@ async def excluir_usuario(id_usuario: int = Form(...)):
         ["body", "id_produto"],
     )
     return JSONResponse(pd.to_dict(), status_code=404)
+
+@router.get("/listar_categorias")
+async def listar_categorias():
+    categorias = CategoriaRepo.obter_todas_as_categorias()
+    return categorias
+
+@router.post("/inserir_categoria", status_code=201)
+async def inserir_categoria(nome: str = Form(..., title="Nome da Categoria")):
+    categorias_existentes = {categoria.nome for categoria in CategoriaRepo.obter_todos()}
+    
+    if nome in categorias_existentes:
+        pd = ProblemDetailsDto(
+            "categoria",
+            f"A categoria com o nome <b>{nome}</b> já existe.",
+            "category_exists",
+            ["body", "nome"],
+        )
+        return JSONResponse(pd.to_dict(), status_code=400)
+    
+    nova_categoria = Categoria(nome=nome)
+    categoria_criada = CategoriaRepo.inserir(nova_categoria)
+
+    if categoria_criada:
+        return categoria_criada
+
+    pd = ProblemDetailsDto(
+        "categoria",
+        "Não foi possível inserir a categoria.",
+        "creation_failed",
+        ["body", "nome"],
+    )
+    return JSONResponse(pd.to_dict(), status_code=500)
+
+@router.post("/alterar_categoria", status_code=204)
+async def alterar_categoria(
+    id_categoria: int = Form(..., title="Id da Categoria"),
+    nome: str = Form(..., title="Novo Nome da Categoria")
+):
+    categoria = CategoriaRepo.obter_um(id_categoria)
+    if not categoria:
+        pd = ProblemDetailsDto(
+            "int",
+            f"A categoria com id <b>{id_categoria}</b> não foi encontrada.",
+            "value_not_found",
+            ["body", "id_categoria"],
+        )
+        return JSONResponse(pd.to_dict(), status_code=404)
+    
+    categorias_existentes = {categoria.nome for categoria in CategoriaRepo.obter_todos()}
+    if nome in categorias_existentes and nome != categoria.nome:
+        pd = ProblemDetailsDto(
+            "categoria",
+            f"Já existe uma categoria com o nome <b>{nome}</b>.",
+            "category_exists",
+            ["body", "nome"],
+        )
+        return JSONResponse(pd.to_dict(), status_code=400)
+    
+    categoria.nome = nome
+    categoria_alterada = CategoriaRepo.alterar(categoria)
+    
+    if categoria_alterada:
+        return None
+
+    pd = ProblemDetailsDto(
+        "int",
+        f"Erro ao alterar a categoria com id <b>{id_categoria}</b>.",
+        "update_failed",
+        ["body", "id_categoria"],
+    )
+    return JSONResponse(pd.to_dict(), status_code=500)
+
+@router.post("/excluir_categoria", status_code=204)
+async def excluir_categoria(id_categoria: int = Form(..., title="Id da Categoria", ge=1)):
+    categoria = CategoriaRepo.obter_um(id_categoria)
+    if not categoria:
+        pd = ProblemDetailsDto(
+            "int",
+            f"A categoria com id <b>{id_categoria}</b> não foi encontrada.",
+            "value_not_found",
+            ["body", "id_categoria"],
+        )
+        return JSONResponse(pd.to_dict(), status_code=404)
+    
+    categoria_arquivada = CategoriaRepo.excluir(id_categoria)
+    
+    if categoria_arquivada:
+        return None
+
+    pd = ProblemDetailsDto(
+        "int",
+        f"Erro ao desativar a categoria com id <b>{id_categoria}</b>.",
+        "deletion_failed",
+        ["body", "id_categoria"],
+    )
+    return JSONResponse(pd.to_dict(), status_code=500)
+
+
+# @router.post("/reativar_categoria", status_code=204)
+# async def reativar_categoria(id_categoria: int = Form(..., title="Id da Categoria", ge=1)):
+#     categoria = CategoriaRepo.obter_um(id_categoria)
+#     if not categoria:
+#         pd = ProblemDetailsDto(
+#             "int",
+#             f"A categoria com id <b>{id_categoria}</b> não foi encontrada.",
+#             "value_not_found",
+#             ["body", "id_categoria"],
+#         )
+#         return JSONResponse(pd.to_dict(), status_code=404)
+    
+#     if CategoriaRepo.reativar(id_categoria):
+#         return None
+
+#     pd = ProblemDetailsDto(
+#         "int",
+#         f"Erro ao reativar a categoria com id <b>{id_categoria}</b>.",
+#         "update_failed",
+#         ["body", "id_categoria"],
+#     )
+#     return JSONResponse(pd.to_dict(), status_code=500)

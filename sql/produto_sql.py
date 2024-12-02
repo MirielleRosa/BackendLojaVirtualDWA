@@ -16,9 +16,10 @@ SQL_INSERIR = """
 """
 
 SQL_OBTER_TODOS = """
-    SELECT p.id, p.nome, p.preco, p.descricao, p.estoque, c.nome AS categoria
+    SELECT p.id, p.nome, p.preco, p.descricao, p.estoque, c.id AS categoria_id, c.nome AS categoria_nome, c.ativo AS categoria_ativo
     FROM produto p
     LEFT JOIN categoria c ON p.categoria_id = c.id
+    WHERE c.ativo = 1
     ORDER BY p.nome
 """
 

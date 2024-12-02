@@ -24,7 +24,8 @@ PedidoRepo.criar_tabela()
 CategoriaRepo.criar_tabela()
 CategoriaRepo.inserir_categorias_json("sql/categorias.json")
 ItemPedidoRepo.criar_tabela()
-app = FastAPI(dependencies=[Depends(checar_autorizacao)])
+app = FastAPI()
+# app = FastAPI(dependencies=[Depends(checar_autorizacao)])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -33,7 +34,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.mount(path="/static", app=StaticFiles(directory="static"), name="static")
-app.middleware("http")(checar_autenticacao)
+# app.middleware("http")(checar_autenticacao)
 configurar_excecoes(app)
 app.include_router(main_routes.router)
 app.include_router(cliente_routes.router)

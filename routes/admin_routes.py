@@ -23,13 +23,13 @@ from util.images import transformar_em_quadrada
 SLEEP_TIME = 0.2
 router = APIRouter(prefix="/admin")
 
-
 @router.get("/obter_produtos")
 async def obter_produtos():
     await asyncio.sleep(SLEEP_TIME)
     produtos = ProdutoRepo.obter_todos()
+    for produto in produtos:
+        print(f"Produto: {produto.nome}, Categoria ID: {produto.categoria_id}, Categoria: {produto.categoria_nome}, Categoria Ativo: {produto.categoria_ativo}")
     return produtos
-
 
 @router.post("/inserir_produto", status_code=201)
 async def inserir_produto(
@@ -37,7 +37,7 @@ async def inserir_produto(
     preco: float = Form(...),
     descricao: str = Form(...),
     estoque: int = Form(...),
-    id_categoria: int = Form(...),
+    categoria_id: int = Form(...),
     imagem: Optional[UploadFile] = File(None)
 ):    
     produto_dto = InserirProdutoDto(
@@ -45,29 +45,43 @@ async def inserir_produto(
         preco=preco,
         descricao=descricao,
         estoque=estoque,
-        id_categoria=id_categoria 
+        categoria_id=categoria_id 
     )
-    conteudo_arquivo = await imagem.read()
-    imagem = Image.open(BytesIO(conteudo_arquivo))
-    if not imagem:
-        pd = ProblemDetailsDto(
-            "imagem",
-            "O arquivo enviado não é uma imagem válida.",
-            "invalid_file",
-            ["body", "imagem"],
-        )
-        return JSONResponse(pd.to_dict(), status_code=422)
-    await asyncio.sleep(SLEEP_TIME)
-    novo_produto = Produto(
-        None, produto_dto.nome, produto_dto.preco, produto_dto.descricao, produto_dto.estoque, 
-        produto_dto.id_categoria
-    )
-    novo_produto = ProdutoRepo.inserir(novo_produto)
-    if novo_produto:
-        imagem_quadrada = transformar_em_quadrada(imagem)
-        imagem_quadrada.save(f"static/img/produtos/{novo_produto.id:04d}.jpg", "JPEG")
-    return novo_produto
 
+    if imagem:
+        conteudo_arquivo = await imagem.read()
+        imagem_obj = Image.open(BytesIO(conteudo_arquivo))
+        if not imagem_obj:
+            pd = {
+                "title": "imagem",
+                "detail": "O arquivo enviado não é uma imagem válida.",
+                "type": "invalid_file",
+                "path": ["body", "imagem"],
+            }
+            return JSONResponse(pd, status_code=422)
+
+        # Salvando a imagem
+        imagem_quadrada = transformar_em_quadrada(imagem_obj)
+        imagem_quadrada.save(f"static/img/produtos/{produto_dto.categoria_id:04d}.jpg", "JPEG")
+
+    # Inserindo o produto no banco de dados
+    await asyncio.sleep(SLEEP_TIME)  # Simulando atraso
+    novo_produto = Produto(
+        None, produto_dto.nome, produto_dto.preco, produto_dto.descricao, produto_dto.estoque,
+        produto_dto.categoria_id
+    )
+    novo_produto = await ProdutoRepo.inserir(novo_produto)
+
+    if novo_produto:
+        return novo_produto
+    else:
+        pd = {
+            "title": "erro_insercao",
+            "detail": "O produto não pôde ser inserido.",
+            "type": "database_error",
+            "path": ["body"],
+        }
+        return JSONResponse(pd, status_code=500)
 
 @router.post("/excluir_produto", status_code=204)
 async def excluir_produto(id_produto: int = Form(..., title="Id do Produto", ge=1)):
@@ -223,8 +237,26 @@ async def excluir_usuario(id_usuario: int = Form(...)):
 
 @router.get("/listar_categorias")
 async def listar_categorias():
-    categorias = CategoriaRepo.obter_todas_as_categorias()
+    categorias = CategoriaRepo.obter_todos()
     return categorias
+
+@router.get("/listar_categorias_ativas")
+async def listar_categorias_ativas():
+    categorias = CategoriaRepo.obter_todos_ativos()
+    return categorias
+
+@router.get("/listar_categoria/{categoria_id}")
+async def listar_categoria(categoria_id: int):
+    categoria = CategoriaRepo.obter_um(categoria_id)
+    if not categoria:
+        pd = ProblemDetailsDto(
+            "int",
+            f"A categoria com id <b>{categoria_id}</b> não foi encontrada.",
+            "value_not_found",
+            ["path", "categoria_id"],
+        )
+        return JSONResponse(pd.to_dict(), status_code=404)
+    return categoria
 
 @router.post("/inserir_categoria", status_code=201)
 async def inserir_categoria(nome: str = Form(..., title="Nome da Categoria")):
@@ -255,16 +287,17 @@ async def inserir_categoria(nome: str = Form(..., title="Nome da Categoria")):
 
 @router.post("/alterar_categoria", status_code=204)
 async def alterar_categoria(
-    id_categoria: int = Form(..., title="Id da Categoria"),
-    nome: str = Form(..., title="Novo Nome da Categoria")
+    categoria_id: int = Form(..., title="Id da Categoria"),
+    nome: str = Form(..., title="Novo Nome da Categoria"),
+    ativo: int = Form(..., title="Status da Categoria") 
 ):
-    categoria = CategoriaRepo.obter_um(id_categoria)
+    categoria = CategoriaRepo.obter_um(categoria_id)
     if not categoria:
         pd = ProblemDetailsDto(
             "int",
-            f"A categoria com id <b>{id_categoria}</b> não foi encontrada.",
+            f"A categoria com id <b>{categoria_id}</b> não foi encontrada.",
             "value_not_found",
-            ["body", "id_categoria"],
+            ["body", "categoria_id"],
         )
         return JSONResponse(pd.to_dict(), status_code=404)
     
@@ -279,6 +312,8 @@ async def alterar_categoria(
         return JSONResponse(pd.to_dict(), status_code=400)
     
     categoria.nome = nome
+    categoria.ativo = ativo  # Atualiza o status da categoria
+    
     categoria_alterada = CategoriaRepo.alterar(categoria)
     
     if categoria_alterada:
@@ -286,57 +321,57 @@ async def alterar_categoria(
 
     pd = ProblemDetailsDto(
         "int",
-        f"Erro ao alterar a categoria com id <b>{id_categoria}</b>.",
+        f"Erro ao alterar a categoria com id <b>{categoria_id}</b>.",
         "update_failed",
-        ["body", "id_categoria"],
+        ["body", "categoria_id"],
     )
     return JSONResponse(pd.to_dict(), status_code=500)
 
 @router.post("/excluir_categoria", status_code=204)
-async def excluir_categoria(id_categoria: int = Form(..., title="Id da Categoria", ge=1)):
-    categoria = CategoriaRepo.obter_um(id_categoria)
+async def excluir_categoria(categoria_id: int = Form(..., title="Id da Categoria", ge=1)):
+    categoria = CategoriaRepo.obter_um(categoria_id)
     if not categoria:
         pd = ProblemDetailsDto(
             "int",
-            f"A categoria com id <b>{id_categoria}</b> não foi encontrada.",
+            f"A categoria com id <b>{categoria_id}</b> não foi encontrada.",
             "value_not_found",
-            ["body", "id_categoria"],
+            ["body", "categoria_id"],
         )
         return JSONResponse(pd.to_dict(), status_code=404)
     
-    categoria_arquivada = CategoriaRepo.excluir(id_categoria)
+    categoria.ativo = 0 
+    categoria_alterada = CategoriaRepo.alterar(categoria)
     
-    if categoria_arquivada:
+    if categoria_alterada:
         return None
 
     pd = ProblemDetailsDto(
         "int",
-        f"Erro ao desativar a categoria com id <b>{id_categoria}</b>.",
+        f"Erro ao desativar a categoria com id <b>{categoria_id}</b>.",
         "deletion_failed",
-        ["body", "id_categoria"],
+        ["body", "categoria_id"],
     )
     return JSONResponse(pd.to_dict(), status_code=500)
 
-
 # @router.post("/reativar_categoria", status_code=204)
-# async def reativar_categoria(id_categoria: int = Form(..., title="Id da Categoria", ge=1)):
-#     categoria = CategoriaRepo.obter_um(id_categoria)
+# async def reativar_categoria(categoria_id: int = Form(..., title="Id da Categoria", ge=1)):
+#     categoria = CategoriaRepo.obter_um(categoria_id)
 #     if not categoria:
 #         pd = ProblemDetailsDto(
 #             "int",
-#             f"A categoria com id <b>{id_categoria}</b> não foi encontrada.",
+#             f"A categoria com id <b>{categoria_id}</b> não foi encontrada.",
 #             "value_not_found",
-#             ["body", "id_categoria"],
+#             ["body", "categoria_id"],
 #         )
 #         return JSONResponse(pd.to_dict(), status_code=404)
     
-#     if CategoriaRepo.reativar(id_categoria):
+#     if CategoriaRepo.reativar(categoria_id):
 #         return None
 
 #     pd = ProblemDetailsDto(
 #         "int",
-#         f"Erro ao reativar a categoria com id <b>{id_categoria}</b>.",
+#         f"Erro ao reativar a categoria com id <b>{categoria_id}</b>.",
 #         "update_failed",
-#         ["body", "id_categoria"],
+#         ["body", "categoria_id"],
 #     )
 #     return JSONResponse(pd.to_dict(), status_code=500)

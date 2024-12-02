@@ -16,20 +16,20 @@ class ProdutoRepo:
             cursor.execute(SQL_CRIAR_TABELA)
 
     @classmethod
-    def inserir(cls, produto: Produto) -> Optional[Produto]:
-        try:
-            with obter_conexao() as conexao:
-                cursor = conexao.cursor()
-                cursor.execute(
-                    SQL_INSERIR,
-                    (produto.nome, produto.preco, produto.descricao, produto.estoque, produto.categoria_id),
-                )
-                if cursor.rowcount > 0:
-                    produto.id = cursor.lastrowid
-                    return produto
-        except sqlite3.Error as ex:
-            print(ex)
-            return None
+    async def inserir(cls, produto: Produto) -> Optional[Produto]:
+            try:
+                with obter_conexao() as conexao:
+                    cursor = conexao.cursor()
+                    cursor.execute(
+                        SQL_INSERIR,
+                        (produto.nome, produto.preco, produto.descricao, produto.estoque, produto.categoria_id),
+                    )
+                    if cursor.rowcount > 0:
+                        produto.id = cursor.lastrowid
+                        return produto
+            except sqlite3.Error as ex:
+                print(ex)
+                return None
 
     @classmethod
     def obter_todos(cls) -> List[Produto]:
@@ -37,11 +37,18 @@ class ProdutoRepo:
             with obter_conexao() as conexao:
                 cursor = conexao.cursor()
                 tuplas = cursor.execute(SQL_OBTER_TODOS).fetchall()
-                produtos = [Produto(*t) for t in tuplas]
+                produtos = []
+                for tupla in tuplas:
+                    produto = Produto(*tupla)
+                    # Não é necessário fazer outra consulta, pois os dados da categoria já estão na tupla
+                    produto.categoria_nome = tupla[6]  # Nome da categoria (já vem da consulta SQL)
+                    produto.categoria_ativo = tupla[7]  # Ativo da categoria (já vem da consulta SQL)
+                    produtos.append(produto)
                 return produtos
         except sqlite3.Error as ex:
             print(ex)
             return None
+
 
     @classmethod
     def alterar(cls, produto: Produto) -> bool:

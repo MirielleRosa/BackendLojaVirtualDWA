@@ -17,16 +17,16 @@ class CategoriaRepo:
         try:
             with open(arquivo_json, "r") as f:
                 categorias_data = json.load(f)
-            
-            categorias_existentes = {categoria.nome for categoria in cls.obter_todos()}
-            
+
             for categoria_data in categorias_data:
                 nome_categoria = categoria_data["nome"]
-                
-                if nome_categoria not in categorias_existentes:
+
+                # Verificar se a categoria já existe no banco
+                if not cls.categoria_existe(nome_categoria):
                     categoria = Categoria(nome=nome_categoria)
                     cls.inserir(categoria)
-                    categorias_existentes.add(nome_categoria) 
+                else:
+                    print(f"A categoria '{nome_categoria}' já existe. Ignorando inserção.")
                     
         except FileNotFoundError:
             print(f"Arquivo {arquivo_json} não encontrado.")
@@ -35,6 +35,17 @@ class CategoriaRepo:
         except Exception as ex:
             print(f"Erro ao inserir categorias: {ex}")
 
+    @classmethod
+    def categoria_existe(cls, nome_categoria: str) -> bool:
+        try:
+            with obter_conexao() as conexao:
+                cursor = conexao.cursor()
+                cursor.execute("SELECT 1 FROM categoria WHERE nome = ?", (nome_categoria,))
+                return cursor.fetchone() is not None
+        except sqlite3.Error as ex:
+            print(f"Erro ao verificar categoria: {ex}")
+            return False
+        
     @classmethod
     def inserir(cls, categoria: Categoria) -> Optional[Categoria]:
         try:
@@ -59,13 +70,25 @@ class CategoriaRepo:
         except sqlite3.Error as ex:
             print(ex)
             return []
+        
+    @classmethod
+    def obter_todos_ativos(cls) -> List[Categoria]:
+        try:
+            with obter_conexao() as conexao:
+                cursor = conexao.cursor()
+                tuplas = cursor.execute(SQL_OBTER_TODOS_ATIVOS).fetchall()
+                categorias = [Categoria(*t) for t in tuplas]
+                return categorias
+        except sqlite3.Error as ex:
+            print(ex)
+            return []
 
     @classmethod
     def alterar(cls, categoria: Categoria) -> bool:
         try:
             with obter_conexao() as conexao:
                 cursor = conexao.cursor()
-                cursor.execute(SQL_ALTERAR, (categoria.nome, categoria.id))
+                cursor.execute(SQL_ALTERAR, (categoria.nome, categoria.ativo, categoria.id))
                 return cursor.rowcount > 0
         except sqlite3.Error as ex:
             print(ex)
@@ -76,7 +99,7 @@ class CategoriaRepo:
         try:
             with obter_conexao() as conexao:
                 cursor = conexao.cursor()
-                cursor.execute(SQL_EXCLUIR, (id,))
+                cursor.execute(SQL_DESATIVAR, (id,))
                 return cursor.rowcount > 0
         except sqlite3.Error as ex:
             print(ex)

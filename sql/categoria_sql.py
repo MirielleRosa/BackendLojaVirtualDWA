@@ -12,22 +12,28 @@ SQL_INSERIR= """
 """
 
 SQL_OBTER_TODOS = """
-    SELECT id, nome
+    SELECT id, nome, ativo
     FROM categoria
-    WHERE ativo = 1
+    ORDER BY nome
+"""
+
+SQL_OBTER_TODOS_ATIVOS = """
+    SELECT id, nome, ativo
+    FROM categoria
+    WHERE Ativo = 1
     ORDER BY nome
 """
 
 SQL_ALTERAR = """
     UPDATE categoria
-    SET nome=?
+    SET nome=?, ativo=?
     WHERE id=?
 """
 
-SQL_EXCLUIR = """
-    UPDATE categoria
-    SET ativo = 0
-    WHERE id = ?
+SQL_DESATIVAR = """
+UPDATE categorias
+SET ativo = 0
+WHERE id = ?
 """
 
 SQL_OBTER_UM = """

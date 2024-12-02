@@ -40,9 +40,8 @@ class ProdutoRepo:
                 produtos = []
                 for tupla in tuplas:
                     produto = Produto(*tupla)
-                    # Não é necessário fazer outra consulta, pois os dados da categoria já estão na tupla
-                    produto.categoria_nome = tupla[6]  # Nome da categoria (já vem da consulta SQL)
-                    produto.categoria_ativo = tupla[7]  # Ativo da categoria (já vem da consulta SQL)
+                    produto.categoria_nome = tupla[6]  
+                    produto.categoria_ativo = tupla[7]  
                     produtos.append(produto)
                 return produtos
         except sqlite3.Error as ex:
@@ -71,6 +70,22 @@ class ProdutoRepo:
             print(ex)
             return False
 
+    def obter_por_categoria(cls, categoria_id: int) -> List[Produto]:
+            try:
+                with obter_conexao() as conexao:
+                    cursor = conexao.cursor()
+                    tuplas = cursor.execute(SQL_OBTER_POR_CATEGORIA, (categoria_id,)).fetchall()
+                    produtos = []
+                    for tupla in tuplas:
+                        produto = Produto(*tupla)
+                        produto.categoria_nome = tupla[6]  
+                        produto.categoria_ativo = tupla[7]
+                        produtos.append(produto)
+                    return produtos
+            except sqlite3.Error as ex:
+                print(ex)
+                return None
+        
     @classmethod
     def excluir(cls, id: int) -> bool:
         try:

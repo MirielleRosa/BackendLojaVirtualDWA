@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from dtos.entrar_dto import EntrarDto
+from repositories.categoria_repo import CategoriaRepo
 from util.html import ler_html
 from dtos.inserir_usuario_dto import InserirUsuarioDTO
 from models.usuario_model import Usuario
@@ -22,21 +23,29 @@ from util.templates import obter_jinja_templates
 router = APIRouter(include_in_schema=False)
 templates = obter_jinja_templates("templates/main")
 
-
 @router.get("/html/{arquivo}")
 async def get_html(arquivo: str):
     response = HTMLResponse(ler_html(arquivo))
     return response
 
-
 @router.get("/")
-async def get_root(request: Request):
-    produtos = ProdutoRepo.obter_todos()
+async def get_root(request: Request, categoria: str = Query("")):  
+    print(categoria)
+
+    if categoria:
+        produtos = ProdutoRepo.obter_por_categoria(ProdutoRepo, int(categoria))
+    else:
+        produtos = ProdutoRepo.obter_todos()
+        
+    categorias = CategoriaRepo.obter_todos_ativos()
+
     return templates.TemplateResponse(
         "pages/index.html",
         {
             "request": request,
             "produtos": produtos,
+            "categorias": categorias,
+            "categoria_selecionada": categoria,
         },
     )
 
@@ -130,7 +139,6 @@ async def get_produto(request: Request, id: int):
             "produto": produto,
         },
     )
-
 
 @router.get("/buscar")
 async def get_buscar(

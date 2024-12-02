@@ -23,6 +23,16 @@ SQL_OBTER_TODOS = """
     ORDER BY p.nome
 """
 
+SQL_OBTER_POR_CATEGORIA = """
+    SELECT 
+    p.id, p.nome, p.preco, p.descricao, p.estoque, p.categoria_id, 
+    c.nome AS categoria_nome, c.ativo AS categoria_ativo
+    FROM produto p
+    JOIN categoria c ON p.categoria_id = c.id
+    WHERE p.categoria_id = ?
+"""
+
+
 SQL_ALTERAR = """
     UPDATE produto
     SET nome=?, preco=?, descricao=?, estoque=?, categoria_id=?
@@ -38,8 +48,9 @@ SQL_OBTER_UM = """
     SELECT p.id, p.nome, p.preco, p.descricao, p.estoque, c.nome AS categoria
     FROM produto p
     LEFT JOIN categoria c ON p.categoria_id = c.id
-    WHERE p.id=?
+    WHERE c.ativo = 1 AND p.id=?
 """
+
 
 SQL_OBTER_QUANTIDADE = """
     SELECT COUNT(*) FROM produto
@@ -51,6 +62,7 @@ SQL_OBTER_BUSCA = """
     LEFT JOIN categoria c ON p.categoria_id = c.id
     WHERE (p.nome LIKE ? OR p.descricao LIKE ?)
       AND (? IS NULL OR c.id = ?)
+      AND c.ativo = 1
     ORDER BY #1
     LIMIT ? OFFSET ?
 """
@@ -60,5 +72,6 @@ SQL_OBTER_QUANTIDADE_BUSCA = """
     FROM produto p
     LEFT JOIN categoria c ON p.categoria_id = c.id
     WHERE (p.nome LIKE ? OR p.descricao LIKE ?)
+      AND c.ativo = 1
       AND (? IS NULL OR c.id = ?)
 """
